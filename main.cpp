@@ -1,7 +1,13 @@
 #include <stdio.h>
+#include <iostream>
+#include <cstdlib>
 #include <string.h>
 #include "version.h"
 #include "3rd/cJSON/cJSON.h"
+#include <jemalloc/jemalloc.h>
+#include <vector>
+#include <unistd.h>
+#include <ctime>
 
 void print_version();
 
@@ -84,6 +90,29 @@ void print_json() {
     printf("%s\n", str);
 }
 
+class Widget {
+        public:
+                Widget() { }
+                ~Widget() {}
+                void hello() { std::cout << "hello, world" << std::endl;}
+        private:
+                std::string str_;
+                char buf[1024];
+                int i;
+                int j;
+                std::string str2_;
+};
+
+void jemalloc_example(){
+     time_t t = time(NULL);
+        for (int i = 0; i < 100000000; i++) {
+                Widget *w = new Widget();
+                delete w;
+        }
+
+        std::cout << "cost:" << time(NULL) - t << "s" << std::endl;
+}
+
 int main(int argc, char *argv[]) { // argc: argument count, argv: argument vector
     if (argc == 2 && (equal(strcmp(argv[1], "-v")) || equal(strcmp(argv[1], "--version")))) {
         print_version();
@@ -108,6 +137,7 @@ int main(int argc, char *argv[]) { // argc: argument count, argv: argument vecto
     }
 
     print_json();
+    jemalloc_example();
     return 0;
 }
 

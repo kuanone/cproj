@@ -8,6 +8,7 @@
 #include <vector>
 #include <unistd.h>
 #include <ctime>
+#include <curl/curl.h>
 
 void print_version();
 
@@ -113,6 +114,25 @@ void jemalloc_example(){
         std::cout << "cost:" << time(NULL) - t << "s" << std::endl;
 }
 
+void curl_example(){
+        // 初始化libcurl
+    curl_global_init(CURL_GLOBAL_ALL);
+    CURL* curl = curl_easy_init();
+    if(curl) {
+        // 设置请求的URL（示例：https://www.example.com）
+        curl_easy_setopt(curl, CURLOPT_URL, "https://www.example.com");
+        // 执行请求并输出结果
+        CURLcode res = curl_easy_perform(curl);
+        if(res != CURLE_OK) {
+            std::cout << "curl perform failed: " << curl_easy_strerror(res) << std::endl;
+        }
+        // 清理资源
+        curl_easy_cleanup(curl);
+    }
+    // 全局清理libcurl
+    curl_global_cleanup();
+}
+
 int main(int argc, char *argv[]) { // argc: argument count, argv: argument vector
     if (argc == 2 && (equal(strcmp(argv[1], "-v")) || equal(strcmp(argv[1], "--version")))) {
         print_version();
@@ -138,12 +158,10 @@ int main(int argc, char *argv[]) { // argc: argument count, argv: argument vecto
 
     print_json();
     jemalloc_example();
+    curl_example();
     return 0;
 }
 
 void print_version() {
     printf("Version：%d.%d.%d\n", PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
 }
-
-
-

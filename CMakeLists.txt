@@ -37,10 +37,15 @@ configure_file(
 
 add_subdirectory(3rd/cJSON)
 
+# 查找并链接curl动态库
+find_package(CURL REQUIRED)
+include_directories(${CURL_INCLUDE_DIRS})
+link_directories(${CURL_LIBRARY_DIRS})
+
 add_executable(cproj main.cpp
         3rd/cJSON/cJSON.c)
 
 #target_include_directories(cproj PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_include_directories(cproj PRIVATE)
 
-target_link_libraries(${PROJECT_NAME} cjson  /usr/local/lib/libjemalloc.a)
+target_link_libraries(${PROJECT_NAME}  ${CURL_LIBRARIES} cjson /usr/local/lib/libjemalloc.a)

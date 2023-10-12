@@ -1,7 +1,7 @@
-#include <stdio.h>
+#include <cstdio>
 #include <iostream>
 #include <cstdlib>
-#include <string.h>
+#include <cstring>
 #include "version.h"
 #include "3rd/cJSON/cJSON.h"
 #include <jemalloc/jemalloc.h>
@@ -10,13 +10,14 @@
 #include <ctime>
 #include <curl/curl.h>
 
-#include <stdlib.h>
-
 #ifdef __linux__
+
 #include <unistd.h>
+
 #elif _WIN32
 #include <windows.h>
 #endif
+
 int get_cpu_cores() {
 #ifdef __linux__
     return sysconf(_SC_NPROCESSORS_ONLN);
@@ -28,11 +29,12 @@ int get_cpu_cores() {
     return 0; // 平台不支持获取 CPU 核数
 #endif
 }
+
 unsigned long long get_total_memory() {
 #ifdef __linux__
     long pages = sysconf(_SC_PHYS_PAGES);
     long page_size = sysconf(_SC_PAGE_SIZE);
-    return (unsigned long long)pages * (unsigned long long)page_size;
+    return (unsigned long long) pages * (unsigned long long) page_size;
 #elif _WIN32
     MEMORYSTATUSEX mem_info;
     mem_info.dwLength = sizeof(MEMORYSTATUSEX);
@@ -53,12 +55,12 @@ int equal(int v) {
     }
 }
 
-int str_split(char *str, char *delim, char **tokens) {
+int str_split(char *str, const char *delim, const char **tokens) {
     int i = 0;
     char *token;
 
     // 遍历字符串
-    while ((token = strsep(&str, delim)) != NULL) {
+    while ((token = strsep(&str, delim)) != nullptr) {
         // 将子字符串存储到 tokens 数组中
         tokens[i++] = token;
     }
@@ -86,10 +88,10 @@ char *str_trim(char *str) {
 }
 
 void print_json() {
-    cJSON *cjson_test = NULL;
-    cJSON *cjson_address = NULL;
-    cJSON *cjson_skill = NULL;
-    char *str = NULL;
+    cJSON *cjson_test = nullptr;
+    cJSON *cjson_address = nullptr;
+    cJSON *cjson_skill = nullptr;
+    char *str = nullptr;
 
     /* 创建一个JSON数据对象(链表头结点) */
     cjson_test = cJSON_CreateObject();
@@ -122,41 +124,48 @@ void print_json() {
     /* 打印JSON对象(整条链表)的所有数据 */
     str = cJSON_PrintUnformatted(cjson_test);
     printf("%s\n", str);
+    free(str);
+    free(cjson_test);
+    free(cjson_address);
+    free(cjson_skill);
 }
 
 class Widget {
-        public:
-                Widget() { }
-                ~Widget() {}
-                void hello() { std::cout << "hello, world" << std::endl;}
-        private:
-                std::string str_;
-                char buf[1024];
-                int i;
-                int j;
-                std::string str2_;
+public:
+    Widget() {}
+
+    ~Widget() {}
+
+    void hello() { std::cout << "hello, world" << std::endl; }
+
+private:
+    std::string str_;
+    char buf[1024];
+    int i;
+    int j;
+    std::string str2_;
 };
 
-void jemalloc_example(){
-     time_t t = time(NULL);
-        for (int i = 0; i < 100000000; i++) {
-                Widget *w = new Widget();
-                delete w;
-        }
+void jemalloc_example() {
+    time_t t = time(nullptr);
+    for (int i = 0; i < 100000000; i++) {
+        Widget *w = new Widget();
+        delete w;
+    }
 
-        std::cout << "cost:" << time(NULL) - t << "s" << std::endl;
+    std::cout << "cost:" << time(nullptr) - t << "s" << std::endl;
 }
 
-void curl_example(){
-        // 初始化libcurl
+void curl_example() {
+    // 初始化libcurl
     curl_global_init(CURL_GLOBAL_ALL);
-    CURL* curl = curl_easy_init();
-    if(curl) {
+    CURL *curl = curl_easy_init();
+    if (curl) {
         // 设置请求的URL（示例：https://www.example.com）
         curl_easy_setopt(curl, CURLOPT_URL, "https://www.example.com");
         // 执行请求并输出结果
         CURLcode res = curl_easy_perform(curl);
-        if(res != CURLE_OK) {
+        if (res != CURLE_OK) {
             std::cout << "curl perform failed: " << curl_easy_strerror(res) << std::endl;
         }
         // 清理资源
@@ -166,27 +175,27 @@ void curl_example(){
     curl_global_cleanup();
 }
 
-char* formatBytes(unsigned long long bytes) {
+char *formatBytes(unsigned long long bytes) {
     const char *suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
     int suffixIndex = 0;
 
-    double doubleBytes = (double)bytes;
+    auto doubleBytes = (double) bytes;
 
     while (doubleBytes >= 1024 && suffixIndex < 8) {
         doubleBytes /= 1024;
         suffixIndex++;
     }
 
-    char *formatted = (char *)malloc(20); // 分配内存以存储格式化后的结果
+    char *formatted = (char *) malloc(20); // 分配内存以存储格式化后的结果
 
-    if (formatted != NULL) {
+    if (formatted != nullptr) {
         snprintf(formatted, 20, "%.2f %s", doubleBytes, suffixes[suffixIndex]);
     }
 
     return formatted;
 }
 
-void computer_info(){
+void computer_info() {
     int cpu_cores = get_cpu_cores();
     unsigned long long total_memory = get_total_memory();
 
@@ -209,15 +218,14 @@ int main(int argc, char *argv[]) { // argc: argument count, argv: argument vecto
 
     for (int i = 1; i < argc; ++i) {
         printf("Argument: %s\n", argv[i]);
-        char *str[2];
-//        int count = str_split(strtok(argv[i], "-"), "=", str);
-        int count = str_split(str_trim(argv[i]), "=", str);
+        const char *kv[2];
+//        int count = str_split(strtok(argv[i], "-"), "=", kv);
+        int count = str_split(str_trim(argv[i]), "=", kv);
         if (count == 2) {
-            printf("Key: %s, Value: %s\n", str[0], str[1]);
+            printf("Key: %s, Value: %s\n", kv[0], kv[1]);
         } else {
-            printf("Key: %s, Value: %s\n", str[0], "");
+            printf("Key: %s, Value: %s\n", kv[0], "");
         }
-        free(str);
     }
 
     print_json();

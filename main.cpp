@@ -10,6 +10,39 @@
 #include <ctime>
 #include <curl/curl.h>
 
+#include <stdlib.h>
+
+#ifdef __linux__
+#include <unistd.h>
+#elif _WIN32
+#include <windows.h>
+#endif
+int get_cpu_cores() {
+#ifdef __linux__
+    return sysconf(_SC_NPROCESSORS_ONLN);
+#elif _WIN32
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
+#else
+    return 0; // 平台不支持获取 CPU 核数
+#endif
+}
+unsigned long long get_total_memory() {
+#ifdef __linux__
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    return (unsigned long long)pages * (unsigned long long)page_size;
+#elif _WIN32
+    MEMORYSTATUSEX mem_info;
+    mem_info.dwLength = sizeof(MEMORYSTATUSEX);
+    GlobalMemoryStatusEx(&mem_info);
+    return (unsigned long long)mem_info.ullTotalPhys;
+#else
+    return 0; // 平台不支持获取内存大小
+#endif
+}
+
 void print_version();
 
 int equal(int v) {
@@ -133,6 +166,36 @@ void curl_example(){
     curl_global_cleanup();
 }
 
+char* formatBytes(unsigned long long bytes) {
+    const char *suffixes[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+    int suffixIndex = 0;
+
+    double doubleBytes = (double)bytes;
+
+    while (doubleBytes >= 1024 && suffixIndex < 8) {
+        doubleBytes /= 1024;
+        suffixIndex++;
+    }
+
+    char *formatted = (char *)malloc(20); // 分配内存以存储格式化后的结果
+
+    if (formatted != NULL) {
+        snprintf(formatted, 20, "%.2f %s", doubleBytes, suffixes[suffixIndex]);
+    }
+
+    return formatted;
+}
+
+void computer_info(){
+    int cpu_cores = get_cpu_cores();
+    unsigned long long total_memory = get_total_memory();
+
+    printf("CPU Cores: %d\n", cpu_cores);
+    char *formatted = formatBytes(total_memory);
+    printf("Total Memory: %llu bytes, %s\n", total_memory, formatted);
+    free(formatted);
+}
+
 int main(int argc, char *argv[]) { // argc: argument count, argv: argument vector
     if (argc == 2 && (equal(strcmp(argv[1], "-v")) || equal(strcmp(argv[1], "--version")))) {
         print_version();
@@ -154,11 +217,13 @@ int main(int argc, char *argv[]) { // argc: argument count, argv: argument vecto
         } else {
             printf("Key: %s, Value: %s\n", str[0], "");
         }
+        free(str);
     }
 
     print_json();
     jemalloc_example();
     curl_example();
+    computer_info();
     return 0;
 }
 

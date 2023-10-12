@@ -10,6 +10,15 @@
 #include <ctime>
 #include <curl/curl.h>
 
+#include<sys/socket.h>
+#include<arpa/inet.h> //inet_addr
+#include<netdb.h>
+#include<errno.h>
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/bio.h>
+
 #ifdef __linux__
 
 #include <unistd.h>
@@ -162,11 +171,11 @@ void curl_example() {
     CURL *curl = curl_easy_init();
     if (curl) {
         // 设置请求的URL（示例：https://www.example.com）
-        curl_easy_setopt(curl, CURLOPT_URL, "https://www.example.com");
+        curl_easy_setopt(curl, CURLOPT_URL, "https://www.baidu.com");
         // 执行请求并输出结果
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
-            std::cout << "curl perform failed: " << curl_easy_strerror(res) << std::endl;
+            std::cout << "curl perform failed: " << curl_easy_strerror(res) << "\n" << std::endl;
         }
         // 清理资源
         curl_easy_cleanup(curl);
@@ -205,6 +214,160 @@ void computer_info() {
     free(formatted);
 }
 
+int http_get() {
+    int socket_desc;
+    struct sockaddr_in server{};
+    const char *message;
+
+    //Create socket
+    socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_desc == -1) {
+        printf("Could not create socket");
+    }
+
+    char ip[20] = {0};
+    const char *hostname = "www.cnblogs.com";
+    struct hostent *hp;
+    if ((hp = gethostbyname(hostname)) == nullptr) {
+        close(socket_desc);
+        return 1;
+    }
+
+    strcpy(ip, inet_ntoa(*(struct in_addr *) hp->h_addr_list[0]));
+
+    server.sin_addr.s_addr = inet_addr(ip);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(80);
+
+
+    //Connect to remote server
+    if (connect(socket_desc, (struct sockaddr *) &server, sizeof(server)) < 0) {
+        printf("connect error： %s", errno);
+        close(socket_desc);
+        return 1;
+    }
+
+    puts("Connected\n");
+
+    //Send some data
+    //http 协议
+    message = "GET / HTTP/1.1\r\nHost: www.cnblogs.com\r\n\r\n";
+
+    //向服务器发送数据
+    if (send(socket_desc, message, strlen(message), 0) < 0) {
+        puts("Send failed");
+        close(socket_desc);
+        return 1;
+    }
+    puts("Data Send\n");
+
+    struct timeval timeout = {3, 0};
+    setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(struct timeval));
+
+    //Receive a reply from the server
+    //loop
+    int size_recv, total_size = 0;
+    char chunk[512];
+    while (true) {
+        memset(chunk, 0, 512); //clear the variable
+        //获取数据
+        if ((size_recv = recv(socket_desc, chunk, 512, 0)) == -1) {
+            if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                // 暂时没有数据可读，可以等待或重试
+                break;
+            } else if (errno == EINTR) {
+                printf("interrupt by signal...\n");
+                continue;
+            } else if (errno == ENOENT) {
+                printf("recv RST segement...\n");
+                break;
+            } else {
+                printf("unknown error: %d\n", errno);
+                exit(1);
+            }
+        } else if (size_recv == 0) {
+            printf("Connection closed by server\n");
+            break;
+        } else {
+            total_size += size_recv;
+            chunk[size_recv] = '\0';
+            printf("%s", chunk);
+
+            // 检查响应头是否包含 Content-Length 字段
+            char *content_length_header = strstr(chunk, "Content-Length: ");
+            if (content_length_header) {
+                int content_length;
+                if (sscanf(content_length_header + 16, "%d", &content_length) == 1) {
+                    // 如果已经接收到的数据达到 Content-Length 指定的大小，则认为响应已完全接收
+                    if (size_recv >= content_length) {
+                        printf("Response fully received\n");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    close(socket_desc);
+    printf("Reply received, total_size = %d bytes\n", total_size);
+    return 0;
+}
+
+
+int https_example() {
+    SSL_CTX *ctx = NULL;
+    SSL *ssl = NULL;
+    BIO *web = NULL;
+
+    SSL_library_init();
+    ERR_load_BIO_strings();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
+    const char *hostname = "baidu.com";
+    const char *port = "443";
+    const char *request = "GET / HTTP/1.1\r\nHost: baidu.com\r\n\r\n";
+
+    ctx = SSL_CTX_new(SSLv23_client_method());
+    if (!ctx) {
+        fprintf(stderr, "SSL_CTX_new error\n");
+        return 1;
+    }
+
+    web = BIO_new_ssl_connect(ctx);
+    BIO_get_ssl(web, &ssl);
+    if (!ssl) {
+        fprintf(stderr, "BIO_get_ssl error\n");
+        return 1;
+    }
+
+    BIO_set_conn_hostname(web, hostname);
+    BIO_set_conn_port(web, port);
+
+    if (BIO_do_connect(web) <= 0) {
+        fprintf(stderr, "BIO_do_connect error\n");
+        return 1;
+    }
+
+    if (BIO_do_handshake(web) <= 0) {
+        fprintf(stderr, "BIO_do_handshake error\n");
+        return 1;
+    }
+
+    BIO_puts(web, request);
+
+    char response[4096];
+    int len;
+    while ((len = BIO_read(web, response, sizeof(response))) > 0) {
+        fwrite(response, 1, len, stdout);
+    }
+
+    BIO_free_all(web);
+    SSL_CTX_free(ctx);
+    ERR_free_strings();
+    EVP_cleanup();
+    return 0;
+}
+
 int main(int argc, char *argv[]) { // argc: argument count, argv: argument vector
     if (argc == 2 && (equal(strcmp(argv[1], "-v")) || equal(strcmp(argv[1], "--version")))) {
         print_version();
@@ -232,6 +395,8 @@ int main(int argc, char *argv[]) { // argc: argument count, argv: argument vecto
     jemalloc_example();
     curl_example();
     computer_info();
+//    http_get();
+//    https_example();
     return 0;
 }
 
